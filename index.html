@@ -3,320 +3,665 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>RemoteLink — Peer Control</title>
+<title>RemoteLink</title>
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;800&display=swap');
-  :root {
-    --bg: #080c10; --surface: #0e1319; --surface2: #151d27; --border: #1e2d3d;
-    --accent: #00e5ff; --accent2: #ff3d71; --accent3: #a259ff;
-    --text: #c9d8e8; --text-dim: #4a6070; --success: #00ff9d;
-    --mono: 'Space Mono', monospace; --sans: 'Syne', sans-serif;
-  }
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { background: var(--bg); color: var(--text); font-family: var(--sans); min-height: 100vh; overflow-x: hidden; }
-  body::before {
-    content: ''; position: fixed; inset: 0;
-    background-image: linear-gradient(rgba(0,229,255,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(0,229,255,0.03) 1px, transparent 1px);
-    background-size: 40px 40px; pointer-events: none; z-index: 0;
-  }
-  .container { position: relative; z-index: 1; max-width: 1200px; margin: 0 auto; padding: 0 24px; }
-  header { padding: 24px 0 20px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
-  .logo { display: flex; align-items: center; gap: 10px; font-size: 1.4rem; font-weight: 800; color: #fff; }
-  .logo-icon { width: 32px; height: 32px; background: linear-gradient(135deg, var(--accent), var(--accent3)); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 16px; }
-  .logo span { color: var(--accent); }
-  .status-bar { display: flex; align-items: center; gap: 8px; font-family: var(--mono); font-size: 0.72rem; color: var(--text-dim); }
-  .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--text-dim); transition: background 0.3s; }
-  .dot.live { background: var(--success); box-shadow: 0 0 8px var(--success); animation: pulse 2s infinite; }
-  .dot.busy { background: var(--accent2); box-shadow: 0 0 8px var(--accent2); }
-  .dot.error { background: var(--accent2); }
-  @keyframes pulse { 0%,100%{opacity:1}50%{opacity:0.4} }
-  .main-grid { display: grid; grid-template-columns: 310px 1fr; min-height: calc(100vh - 73px); border-left: 1px solid var(--border); border-right: 1px solid var(--border); }
-  .sidebar { border-right: 1px solid var(--border); padding: 24px 0; display: flex; flex-direction: column; }
-  .sidebar-section { padding: 0 20px 20px; border-bottom: 1px solid var(--border); margin-bottom: 20px; }
-  .section-label { font-family: var(--mono); font-size: 0.65rem; text-transform: uppercase; letter-spacing: 2px; color: var(--text-dim); margin-bottom: 14px; }
-  .my-id-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 16px; }
-  .id-label { font-size: 0.72rem; color: var(--text-dim); margin-bottom: 6px; }
-  .id-value { font-family: var(--mono); font-size: 1.05rem; font-weight: 700; color: var(--accent); letter-spacing: 3px; cursor: pointer; transition: opacity 0.2s; word-break: break-all; min-height: 24px; }
-  .id-value:hover { opacity: 0.7; }
-  .copy-hint { font-size: 0.65rem; color: var(--text-dim); margin-top: 4px; }
-  input[type="text"] { width: 100%; background: var(--surface); border: 1px solid var(--border); color: var(--text); font-family: var(--mono); font-size: 0.8rem; padding: 10px 12px; border-radius: 8px; outline: none; transition: border-color 0.2s; letter-spacing: 1px; }
-  input[type="text"]::placeholder { color: var(--text-dim); }
-  input[type="text"]:focus { border-color: var(--accent); }
-  .input-row { display: flex; gap: 8px; margin-top: 8px; }
-  .btn { font-family: var(--sans); font-weight: 600; font-size: 0.78rem; padding: 10px 16px; border-radius: 8px; border: none; cursor: pointer; transition: all 0.2s; white-space: nowrap; }
-  .btn-primary { background: var(--accent); color: #000; }
-  .btn-primary:hover { background: #33eaff; transform: translateY(-1px); }
-  .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
-  .btn-danger { background: var(--accent2); color: #fff; }
-  .btn-danger:hover { background: #ff6b8a; }
-  .btn-ghost { background: transparent; border: 1px solid var(--border); color: var(--text); }
-  .btn-ghost:hover { border-color: var(--accent); color: var(--accent); }
-  .btn-success { background: var(--success); color: #000; }
-  .btn-success:hover { background: #33ffb3; }
-  .device-list { display: flex; flex-direction: column; gap: 8px; }
-  .device-item { display: flex; align-items: center; gap: 10px; padding: 10px 12px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; cursor: pointer; transition: all 0.2s; }
-  .device-item:hover { border-color: var(--accent); }
-  .device-item.connected { border-color: var(--success); }
-  .device-avatar { width: 32px; height: 32px; border-radius: 8px; background: linear-gradient(135deg, var(--accent3), var(--accent)); display: flex; align-items: center; justify-content: center; font-size: 14px; flex-shrink: 0; }
-  .device-name { font-size: 0.85rem; font-weight: 600; color: #fff; }
-  .device-id { font-family: var(--mono); font-size: 0.65rem; color: var(--text-dim); }
-  .device-status { margin-left: auto; font-family: var(--mono); font-size: 0.65rem; padding: 2px 7px; border-radius: 20px; }
-  .device-status.online { background: rgba(0,255,157,0.1); color: var(--success); }
-  .content { display: flex; flex-direction: column; position: relative; }
-  .welcome-screen { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; text-align: center; padding: 40px; animation: fadeIn 0.6s ease; }
-  @keyframes fadeIn { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:translateY(0)} }
-  .welcome-icon { font-size: 64px; animation: float 4s ease-in-out infinite; }
-  @keyframes float { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-10px)} }
-  .welcome-screen h2 { font-size: 1.8rem; font-weight: 800; color: #fff; }
-  .welcome-screen p { max-width: 380px; color: var(--text-dim); font-size: 0.9rem; line-height: 1.6; }
-  .steps-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 16px; margin-top: 8px; width: 100%; max-width: 600px; }
-  .step-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 16px; text-align: left; transition: border-color 0.2s; }
-  .step-card:hover { border-color: var(--accent3); }
-  .step-num { font-family: var(--mono); font-size: 0.65rem; color: var(--accent3); margin-bottom: 6px; }
-  .step-title { font-size: 0.85rem; font-weight: 600; color: #fff; margin-bottom: 4px; }
-  .step-desc { font-size: 0.75rem; color: var(--text-dim); line-height: 1.5; }
-  .viewer-area { flex: 1; display: none; flex-direction: column; }
-  .viewer-area.active { display: flex; }
-  .viewer-toolbar { display: flex; align-items: center; gap: 12px; padding: 12px 20px; border-bottom: 1px solid var(--border); background: var(--surface); }
-  .viewer-info { display: flex; align-items: center; gap: 10px; flex: 1; }
-  .peer-name { font-weight: 700; font-size: 0.9rem; color: #fff; }
-  .connection-badge { font-family: var(--mono); font-size: 0.65rem; padding: 3px 8px; border-radius: 20px; background: rgba(0,229,255,0.1); color: var(--accent); border: 1px solid rgba(0,229,255,0.2); }
-  .latency { font-family: var(--mono); font-size: 0.72rem; color: var(--success); }
-  .viewer-canvas-wrap { flex: 1; background: #000; display: flex; align-items: center; justify-content: center; position: relative; overflow: hidden; }
-  #remoteVideo { max-width: 100%; max-height: 100%; display: block; }
-  .viewer-overlay { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 12px; background: rgba(8,12,16,0.85); backdrop-filter: blur(4px); }
-  .viewer-overlay.hidden { display: none; }
-  .spinner { width: 40px; height: 40px; border: 3px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.8s linear infinite; }
-  @keyframes spin { to{transform:rotate(360deg)} }
-  .overlay-text { font-family: var(--mono); font-size: 0.8rem; color: var(--text-dim); }
-  .control-hints { display: flex; gap: 16px; padding: 8px 20px; border-top: 1px solid var(--border); background: var(--surface); font-family: var(--mono); font-size: 0.65rem; color: var(--text-dim); flex-wrap: wrap; }
-  .hint { display: flex; align-items: center; gap: 5px; }
-  .key { background: var(--surface2); border: 1px solid var(--border); padding: 1px 6px; border-radius: 4px; color: var(--text); }
-  .modal-backdrop { position: fixed; inset: 0; background: rgba(8,12,16,0.88); backdrop-filter: blur(8px); z-index: 100; display: flex; align-items: center; justify-content: center; opacity: 0; pointer-events: none; transition: opacity 0.3s; }
-  .modal-backdrop.open { opacity: 1; pointer-events: all; }
-  .modal { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 32px; max-width: 440px; width: 90%; transform: scale(0.95); transition: transform 0.3s; position: relative; overflow: hidden; }
-  .modal::before { content:''; position:absolute; top:0;left:0;right:0; height:3px; background:linear-gradient(90deg,var(--accent),var(--accent3)); }
-  .modal-backdrop.open .modal { transform: scale(1); }
-  .modal-icon { font-size: 42px; margin-bottom: 16px; }
-  .modal h3 { font-size: 1.3rem; font-weight: 800; color: #fff; margin-bottom: 8px; }
-  .modal p { color: var(--text-dim); font-size: 0.88rem; line-height: 1.6; margin-bottom: 24px; }
-  .modal-id { font-family: var(--mono); font-size: 1.1rem; color: var(--accent); background: rgba(0,229,255,0.07); border: 1px solid rgba(0,229,255,0.15); padding: 12px 16px; border-radius: 8px; text-align: center; letter-spacing: 3px; margin-bottom: 24px; }
-  .modal-actions { display: flex; gap: 10px; justify-content: flex-end; }
-  .toast-container { position: fixed; bottom: 24px; right: 24px; z-index: 200; display: flex; flex-direction: column; gap: 8px; }
-  .toast { background: var(--surface2); border: 1px solid var(--border); border-left: 3px solid var(--accent); color: var(--text); font-size: 0.82rem; padding: 12px 16px; border-radius: 8px; font-family: var(--mono); animation: slideIn 0.3s ease; box-shadow: 0 8px 32px rgba(0,0,0,0.4); max-width: 320px; }
-  .toast.error { border-left-color: var(--accent2); }
-  .toast.success { border-left-color: var(--success); }
-  @keyframes slideIn { from{opacity:0;transform:translateX(20px)} to{opacity:1;transform:translateX(0)} }
-  @keyframes slideOut { from{opacity:1} to{opacity:0;transform:translateX(20px)} }
-  .log-panel { border-top: 1px solid var(--border); background: var(--surface); height: 160px; overflow-y: auto; padding: 10px 16px; font-family: var(--mono); font-size: 0.72rem; display: flex; flex-direction: column; gap: 3px; }
-  .log-line { color: var(--text-dim); }
-  .log-line.info { color: var(--accent); }
-  .log-line.success { color: var(--success); }
-  .log-line.warn { color: #ffbe0b; }
-  .log-line.err { color: var(--accent2); }
-  .retry-banner { display: none; padding: 10px 20px; background: rgba(255,61,113,0.08); border-bottom: 1px solid rgba(255,61,113,0.2); font-family: var(--mono); font-size: 0.75rem; color: var(--accent2); align-items: center; gap: 12px; }
-  .retry-banner.show { display: flex; }
-  ::-webkit-scrollbar { width: 4px; }
-  ::-webkit-scrollbar-track { background: var(--bg); }
-  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Outfit:wght@300;400;600;800&display=swap');
+
+:root {
+  --bg: #04080f;
+  --s1: #080f1a;
+  --s2: #0d1826;
+  --border: #162234;
+  --border2: #1e3048;
+  --a: #00d4ff;
+  --a2: #ff4070;
+  --a3: #7c3aed;
+  --g: #00ff88;
+  --text: #b8cfe0;
+  --dim: #3a5570;
+  --white: #e8f4ff;
+  --mono: 'JetBrains Mono', monospace;
+  --sans: 'Outfit', sans-serif;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* Scanline bg */
+body::before {
+  content: '';
+  position: fixed; inset: 0;
+  background:
+    repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,212,255,0.012) 2px, rgba(0,212,255,0.012) 4px);
+  pointer-events: none; z-index: 0;
+}
+
+/* Glow */
+.glow-orb {
+  position: fixed;
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 0;
+  filter: blur(80px);
+}
+.glow-orb.one { width:500px;height:500px; background:rgba(0,212,255,0.04); top:-200px;left:-150px; }
+.glow-orb.two { width:400px;height:400px; background:rgba(124,58,237,0.05); bottom:-100px;right:-100px; }
+
+/* ── HEADER ── */
+header {
+  position: relative; z-index: 10;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 18px 28px;
+  border-bottom: 1px solid var(--border);
+  background: rgba(4,8,15,0.8);
+  backdrop-filter: blur(12px);
+}
+
+.brand {
+  display: flex; align-items: center; gap: 12px;
+  font-weight: 800; font-size: 1.25rem; color: var(--white);
+  letter-spacing: -0.5px;
+}
+
+.brand-mark {
+  width: 34px; height: 34px;
+  background: linear-gradient(135deg, var(--a), var(--a3));
+  border-radius: 9px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 16px;
+  box-shadow: 0 0 20px rgba(0,212,255,0.3);
+}
+
+.brand em { color: var(--a); font-style: normal; }
+
+.hstatus {
+  display: flex; align-items: center; gap: 8px;
+  font-family: var(--mono); font-size: 0.7rem; color: var(--dim);
+}
+
+.dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--dim);
+  flex-shrink: 0;
+}
+.dot.on  { background: var(--g); box-shadow: 0 0 10px var(--g); animation: blink 2s infinite; }
+.dot.err { background: var(--a2); box-shadow: 0 0 10px var(--a2); }
+.dot.busy{ background: var(--a);  box-shadow: 0 0 10px var(--a); }
+
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:.4} }
+
+/* ── LAYOUT ── */
+.layout {
+  position: relative; z-index: 1;
+  display: grid;
+  grid-template-columns: 290px 1fr;
+  height: calc(100vh - 61px);
+}
+
+/* ── PANEL ── */
+.panel {
+  border-right: 1px solid var(--border);
+  display: flex; flex-direction: column;
+  overflow-y: auto;
+  background: rgba(8,15,26,0.6);
+}
+
+.pblock {
+  padding: 20px;
+  border-bottom: 1px solid var(--border);
+}
+
+.plabel {
+  font-family: var(--mono);
+  font-size: 0.6rem;
+  text-transform: uppercase;
+  letter-spacing: 2.5px;
+  color: var(--dim);
+  margin-bottom: 12px;
+}
+
+/* ID card */
+.id-card {
+  background: var(--s1);
+  border: 1px solid var(--border2);
+  border-radius: 10px;
+  padding: 14px 16px;
+  position: relative;
+  overflow: hidden;
+}
+
+.id-card::before {
+  content: '';
+  position: absolute; top:0; left:0; right:0; height:2px;
+  background: linear-gradient(90deg, var(--a), var(--a3));
+}
+
+.id-small { font-size: 0.7rem; color: var(--dim); margin-bottom: 8px; }
+
+.id-big {
+  font-family: var(--mono);
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--a);
+  letter-spacing: 4px;
+  cursor: pointer;
+  transition: opacity 0.2s;
+  user-select: all;
+  min-height: 36px;
+  display: flex; align-items: center;
+}
+
+.id-big:hover { opacity: 0.7; }
+
+.id-sub {
+  font-family: var(--mono);
+  font-size: 0.65rem;
+  color: var(--dim);
+  margin-top: 6px;
+}
+
+/* Copy btn */
+.copy-btn {
+  margin-top: 10px;
+  width: 100%;
+  background: rgba(0,212,255,0.08);
+  border: 1px solid rgba(0,212,255,0.2);
+  color: var(--a);
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  padding: 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+  letter-spacing: 1px;
+}
+.copy-btn:hover { background: rgba(0,212,255,0.15); }
+.copy-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+
+/* Input */
+.inp {
+  width: 100%;
+  background: var(--s1);
+  border: 1px solid var(--border2);
+  color: var(--white);
+  font-family: var(--mono);
+  font-size: 0.85rem;
+  padding: 10px 14px;
+  border-radius: 8px;
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+}
+.inp::placeholder { color: var(--dim); letter-spacing: 1px; text-transform: none; }
+.inp:focus { border-color: var(--a); box-shadow: 0 0 0 3px rgba(0,212,255,0.1); }
+
+.btn-row { display: flex; gap: 8px; margin-top: 10px; }
+
+.btn {
+  font-family: var(--sans);
+  font-weight: 600;
+  font-size: 0.8rem;
+  padding: 10px 18px;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  transition: all 0.18s;
+  white-space: nowrap;
+}
+
+.btn-go { background: var(--a); color: #000; flex: 1; }
+.btn-go:hover:not(:disabled) { background: #33ddff; transform: translateY(-1px); box-shadow: 0 4px 16px rgba(0,212,255,0.3); }
+.btn-go:disabled { opacity: 0.35; cursor: not-allowed; transform: none; box-shadow: none; }
+
+.btn-kill { background: rgba(255,64,112,0.12); border: 1px solid rgba(255,64,112,0.3); color: var(--a2); }
+.btn-kill:hover { background: rgba(255,64,112,0.2); }
+
+.btn-ok { background: var(--g); color: #000; font-weight: 700; }
+.btn-ok:hover { background: #33ffaa; }
+
+.btn-no { background: transparent; border: 1px solid var(--border2); color: var(--text); }
+.btn-no:hover { border-color: var(--a2); color: var(--a2); }
+
+/* Device list */
+.dev-empty { font-family: var(--mono); font-size: 0.72rem; color: var(--dim); padding: 4px 0; }
+
+.dev-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 12px;
+  background: var(--s1);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+  margin-bottom: 6px;
+}
+.dev-item:hover { border-color: var(--a); }
+.dev-item.live { border-color: rgba(0,255,136,0.4); }
+
+.dev-icon {
+  width: 30px; height: 30px;
+  background: linear-gradient(135deg, var(--a3), var(--a));
+  border-radius: 7px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 13px; flex-shrink: 0;
+}
+
+.dev-name { font-family: var(--mono); font-size: 0.78rem; color: var(--white); }
+.dev-type { font-family: var(--mono); font-size: 0.6rem; color: var(--dim); }
+
+.dev-badge {
+  margin-left: auto;
+  font-family: var(--mono); font-size: 0.6rem;
+  padding: 2px 6px; border-radius: 12px;
+  background: rgba(0,255,136,0.1); color: var(--g);
+}
+
+/* ── MAIN ── */
+.main {
+  display: flex; flex-direction: column;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Welcome */
+.welcome {
+  flex: 1;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: 20px;
+  text-align: center;
+  padding: 40px;
+  animation: fadeUp 0.5s ease;
+}
+
+@keyframes fadeUp { from{opacity:0;transform:translateY(16px)} to{opacity:1;transform:translateY(0)} }
+
+.welcome-ico { font-size: 72px; animation: bob 3s ease-in-out infinite; }
+@keyframes bob { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-12px)} }
+
+.welcome h2 { font-size: 2rem; font-weight: 800; color: var(--white); letter-spacing: -0.5px; }
+.welcome p { color: var(--dim); font-size: 0.9rem; line-height: 1.7; max-width: 360px; }
+
+.howto {
+  display: grid; grid-template-columns: repeat(3,1fr);
+  gap: 14px; width: 100%; max-width: 580px;
+}
+
+.howto-card {
+  background: var(--s1);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px;
+  text-align: left;
+  transition: border-color 0.2s;
+}
+.howto-card:hover { border-color: var(--a3); }
+
+.howto-n { font-family: var(--mono); font-size: 0.6rem; color: var(--a3); margin-bottom: 6px; }
+.howto-t { font-size: 0.82rem; font-weight: 600; color: var(--white); margin-bottom: 4px; }
+.howto-d { font-size: 0.72rem; color: var(--dim); line-height: 1.5; }
+
+.notice {
+  max-width: 560px;
+  padding: 14px 18px;
+  background: rgba(0,212,255,0.04);
+  border: 1px solid rgba(0,212,255,0.12);
+  border-radius: 10px;
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  color: var(--dim);
+  line-height: 1.8;
+  text-align: left;
+}
+.notice strong { color: var(--a); }
+.notice b { color: var(--white); }
+
+/* Viewer */
+.viewer {
+  flex: 1; display: none; flex-direction: column;
+}
+.viewer.on { display: flex; }
+
+.vbar {
+  display: flex; align-items: center; gap: 12px;
+  padding: 10px 20px;
+  border-bottom: 1px solid var(--border);
+  background: var(--s1);
+  flex-shrink: 0;
+}
+
+.vbar-info { display: flex; align-items: center; gap: 10px; flex: 1; }
+.vbar-name { font-weight: 700; font-size: 0.9rem; color: var(--white); }
+.vbadge { font-family: var(--mono); font-size: 0.62rem; padding: 3px 8px; border-radius: 12px; background: rgba(0,212,255,0.1); color: var(--a); border: 1px solid rgba(0,212,255,0.2); }
+.vlat { font-family: var(--mono); font-size: 0.7rem; color: var(--g); }
+
+.vscreen {
+  flex: 1; background: #000;
+  display: flex; align-items: center; justify-content: center;
+  position: relative; overflow: hidden;
+}
+
+#remoteVideo { max-width:100%; max-height:100%; display:block; }
+
+.voverlay {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 14px;
+  background: rgba(4,8,15,0.88);
+  backdrop-filter: blur(6px);
+}
+.voverlay.gone { display: none; }
+
+.spin {
+  width: 44px; height: 44px;
+  border: 3px solid var(--border2);
+  border-top-color: var(--a);
+  border-radius: 50%;
+  animation: spin 0.9s linear infinite;
+}
+@keyframes spin { to{transform:rotate(360deg)} }
+
+.voverlay-txt { font-family: var(--mono); font-size: 0.78rem; color: var(--dim); }
+
+.vinput-layer {
+  position: absolute; inset: 0;
+  cursor: crosshair; z-index: 5;
+}
+
+.vcursor {
+  position: absolute; z-index: 6;
+  width: 14px; height: 14px;
+  border-radius: 50%;
+  border: 2px solid var(--a);
+  background: rgba(0,212,255,0.25);
+  transform: translate(-50%,-50%);
+  pointer-events: none;
+  display: none;
+  box-shadow: 0 0 8px rgba(0,212,255,0.5);
+}
+
+.vhints {
+  display: flex; gap: 16px; flex-wrap: wrap;
+  padding: 8px 20px;
+  border-top: 1px solid var(--border);
+  background: var(--s1);
+  font-family: var(--mono); font-size: 0.62rem; color: var(--dim);
+  flex-shrink: 0;
+}
+.vhint { display:flex;align-items:center;gap:5px; }
+.vkey { background:var(--s2); border:1px solid var(--border2); padding:1px 6px; border-radius:4px; color:var(--text); }
+
+/* Console */
+.console {
+  height: 150px;
+  border-top: 1px solid var(--border);
+  background: rgba(4,8,15,0.9);
+  overflow-y: auto;
+  padding: 8px 16px;
+  font-family: var(--mono);
+  font-size: 0.68rem;
+  display: flex; flex-direction: column; gap: 2px;
+  flex-shrink: 0;
+}
+.cline { color: var(--dim); }
+.cline.i { color: var(--a); }
+.cline.s { color: var(--g); }
+.cline.w { color: #f0a500; }
+.cline.e { color: var(--a2); }
+
+/* Modal */
+.modal-bg {
+  position: fixed; inset: 0;
+  background: rgba(4,8,15,0.9);
+  backdrop-filter: blur(10px);
+  z-index: 200;
+  display: flex; align-items: center; justify-content: center;
+  opacity: 0; pointer-events: none;
+  transition: opacity 0.3s;
+}
+.modal-bg.show { opacity: 1; pointer-events: all; }
+
+.modal {
+  background: var(--s1);
+  border: 1px solid var(--border2);
+  border-radius: 16px;
+  padding: 32px;
+  max-width: 420px; width: 90%;
+  transform: scale(0.93);
+  transition: transform 0.3s;
+  position: relative; overflow: hidden;
+}
+.modal::before { content:''; position:absolute; top:0;left:0;right:0; height:3px; background:linear-gradient(90deg,var(--a),var(--a3)); }
+.modal-bg.show .modal { transform: scale(1); }
+
+.modal-ico { font-size: 44px; margin-bottom: 14px; }
+.modal h3 { font-size: 1.25rem; font-weight: 800; color: var(--white); margin-bottom: 8px; }
+.modal p { color: var(--dim); font-size: 0.85rem; line-height: 1.65; margin-bottom: 20px; }
+
+.modal-id {
+  font-family: var(--mono);
+  font-size: 1.3rem; font-weight: 700;
+  color: var(--a);
+  background: rgba(0,212,255,0.06);
+  border: 1px solid rgba(0,212,255,0.15);
+  padding: 12px 16px;
+  border-radius: 8px;
+  text-align: center;
+  letter-spacing: 4px;
+  margin-bottom: 22px;
+}
+
+.modal-row { display:flex; gap:10px; justify-content:flex-end; }
+
+/* Toasts */
+.toasts { position:fixed; bottom:20px; right:20px; z-index:300; display:flex; flex-direction:column; gap:8px; }
+
+.toast {
+  background: var(--s2);
+  border: 1px solid var(--border2);
+  border-left: 3px solid var(--a);
+  color: var(--text);
+  font-family: var(--mono); font-size: 0.75rem;
+  padding: 11px 15px;
+  border-radius: 8px;
+  max-width: 300px;
+  box-shadow: 0 8px 30px rgba(0,0,0,0.5);
+  animation: tin 0.3s ease;
+}
+.toast.err { border-left-color: var(--a2); }
+.toast.ok  { border-left-color: var(--g); }
+
+@keyframes tin  { from{opacity:0;transform:translateX(16px)} to{opacity:1;transform:translateX(0)} }
+@keyframes tout { from{opacity:1} to{opacity:0;transform:translateX(16px)} }
+
+/* Error banner */
+.errbanner {
+  display: none; align-items: center; gap: 12px;
+  padding: 10px 20px;
+  background: rgba(255,64,112,0.07);
+  border-bottom: 1px solid rgba(255,64,112,0.2);
+  font-family: var(--mono); font-size: 0.72rem; color: var(--a2);
+  flex-shrink: 0;
+}
+.errbanner.show { display: flex; }
+
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: var(--bg); }
+::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
 </style>
 </head>
 <body>
 
-<div class="container">
-  <header>
-    <div class="logo">
-      <div class="logo-icon">⚡</div>
-      Remote<span>Link</span>
-    </div>
-    <div class="status-bar">
-      <div class="dot" id="statusDot"></div>
-      <span id="statusText">Connecting to signaling server…</span>
-    </div>
-  </header>
-</div>
+<div class="glow-orb one"></div>
+<div class="glow-orb two"></div>
 
-<div class="container" style="padding-left:0;padding-right:0;">
-<div class="main-grid">
+<header>
+  <div class="brand">
+    <div class="brand-mark">⚡</div>
+    Remote<em>Link</em>
+  </div>
+  <div class="hstatus">
+    <div class="dot" id="dot"></div>
+    <span id="stxt">Initializing…</span>
+  </div>
+</header>
 
-  <aside class="sidebar">
-    <div class="sidebar-section">
-      <div class="section-label">My Device</div>
-      <div class="my-id-card">
-        <div class="id-label">Your Peer ID</div>
-        <div class="id-value" id="myPeerId" onclick="copyMyId()" title="Click to copy">
-          <span style="color:var(--text-dim);font-size:0.75rem;">connecting…</span>
+<div class="layout">
+
+  <!-- PANEL -->
+  <aside class="panel">
+
+    <div class="pblock">
+      <div class="plabel">My Device</div>
+      <div class="id-card">
+        <div class="id-small">Peer ID — share this</div>
+        <div class="id-big" id="myid" title="Click to copy">
+          <span style="color:var(--dim);font-size:0.7rem;letter-spacing:1px;">loading…</span>
         </div>
-        <div class="copy-hint" id="copyHint">available once connected</div>
+        <div class="id-sub" id="idsub">waiting for signaling server</div>
+        <button class="copy-btn" id="copybtn" onclick="copyId()" disabled>⎘ Copy ID</button>
       </div>
     </div>
 
-    <div class="sidebar-section">
-      <div class="section-label">Connect to Peer</div>
-      <div style="font-size:0.78rem;color:var(--text-dim);margin-bottom:10px;">Enter the Peer ID of the device you want to control</div>
-      <input type="text" id="targetId" placeholder="e.g. abc123xyz" />
-      <div class="input-row">
-        <button class="btn btn-primary" style="flex:1" id="connectBtn" onclick="sendRequest()" disabled>⚡ Connect</button>
-        <button class="btn btn-ghost" onclick="disconnectPeer()">✕</button>
+    <div class="pblock">
+      <div class="plabel">Connect to Remote</div>
+      <div style="font-size:0.78rem;color:var(--dim);margin-bottom:10px;">Enter the other device's Peer ID</div>
+      <input class="inp" id="tid" placeholder="Enter peer ID…" oninput="this.value=this.value.toUpperCase()" />
+      <div class="btn-row">
+        <button class="btn btn-go" id="gobtn" onclick="connect()" disabled>⚡ Connect</button>
+        <button class="btn btn-kill" onclick="hangup()">✕</button>
       </div>
     </div>
 
-    <div class="sidebar-section" style="border-bottom:none;flex:1;">
-      <div class="section-label">Known Devices</div>
-      <div class="device-list" id="deviceList">
-        <div id="emptyDevices" style="font-size:0.78rem;color:var(--text-dim);padding:8px 0;">No devices yet.</div>
-      </div>
+    <div class="pblock" style="border-bottom:none;flex:1;">
+      <div class="plabel">Session History</div>
+      <div id="devlist"><div class="dev-empty" id="devempty">No sessions yet.</div></div>
     </div>
+
   </aside>
 
-  <div class="content">
+  <!-- MAIN -->
+  <div class="main">
 
-    <div class="retry-banner" id="retryBanner">
-      ⚠ Could not reach signaling server — retrying…
-      <button class="btn btn-ghost" style="font-size:0.72rem;padding:4px 10px;" onclick="retryConnect()">Retry Now</button>
+    <div class="errbanner" id="errbanner">
+      ⚠ Signaling disconnected
+      <button class="btn btn-kill" style="font-size:0.68rem;padding:4px 10px;" onclick="reconnect()">Reconnect</button>
     </div>
 
-    <div class="welcome-screen" id="welcomeScreen">
-      <div class="welcome-icon">🖥️</div>
+    <!-- WELCOME -->
+    <div class="welcome" id="welcome">
+      <div class="welcome-ico">🖥️</div>
       <h2>No Active Session</h2>
-      <p>Share your Peer ID with another device, or enter their ID to request screen access.</p>
-      <div class="steps-grid">
-        <div class="step-card">
-          <div class="step-num">01</div>
-          <div class="step-title">Share Your ID</div>
-          <div class="step-desc">Copy your Peer ID once connected and send it to the other person.</div>
+      <p>Share your Peer ID to let someone connect, or enter their ID to request access to their screen.</p>
+
+      <div class="howto">
+        <div class="howto-card">
+          <div class="howto-n">STEP 01</div>
+          <div class="howto-t">Get Your ID</div>
+          <div class="howto-d">Your unique Peer ID appears on the left once connected.</div>
         </div>
-        <div class="step-card">
-          <div class="step-num">02</div>
-          <div class="step-title">Send Request</div>
-          <div class="step-desc">Paste their Peer ID and hit Connect to request screen access.</div>
+        <div class="howto-card">
+          <div class="howto-n">STEP 02</div>
+          <div class="howto-t">Exchange IDs</div>
+          <div class="howto-d">Send your ID to the other device, or get theirs.</div>
         </div>
-        <div class="step-card">
-          <div class="step-num">03</div>
-          <div class="step-title">Live Control</div>
-          <div class="step-desc">After approval, view and interact with the remote screen live.</div>
+        <div class="howto-card">
+          <div class="howto-n">STEP 03</div>
+          <div class="howto-t">Live Control</div>
+          <div class="howto-d">Host approves → controller sees and controls the screen.</div>
         </div>
       </div>
-      <div style="margin-top:12px;padding:14px 18px;background:var(--surface);border:1px solid var(--border);border-radius:10px;font-size:0.78rem;color:var(--text-dim);max-width:560px;text-align:left;line-height:1.8;">
-        <strong style="color:var(--accent)">ℹ How it works:</strong><br>
-        Both devices open this page → share IDs → host clicks "Allow" → controller sees their screen.<br>
-        <strong style="color:var(--text)">Works across internet</strong> via WebRTC P2P. No data passes through any server.
+
+      <div class="notice">
+        <strong>ℹ Both devices must have this page open simultaneously.</strong><br>
+        Works on any network. Screen sharing requires <b>Chrome / Edge / Firefox</b> (not Safari).<br>
+        All data flows directly <b>peer-to-peer</b> — nothing passes through a server.
       </div>
     </div>
 
-    <div class="viewer-area" id="viewerArea">
-      <div class="viewer-toolbar">
-        <div class="viewer-info">
-          <div class="peer-name" id="connectedPeerName">Remote Device</div>
-          <div class="connection-badge">🔒 P2P · WebRTC</div>
-          <div class="latency" id="latencyDisplay">— ms</div>
+    <!-- VIEWER -->
+    <div class="viewer" id="viewer">
+      <div class="vbar">
+        <div class="vbar-info">
+          <div class="vbar-name" id="vname">—</div>
+          <div class="vbadge">🔒 P2P · WebRTC</div>
+          <div class="vlat" id="vlat">— ms</div>
         </div>
-        <button class="btn btn-ghost" style="font-size:0.75rem;" onclick="toggleFullscreen()">⛶ Fullscreen</button>
-        <button class="btn btn-danger" style="font-size:0.75rem;" onclick="disconnectPeer()">✕ End</button>
+        <button class="btn btn-no" style="font-size:0.72rem;padding:6px 12px;" onclick="fullscreen()">⛶ Full</button>
+        <button class="btn btn-kill" style="font-size:0.72rem;padding:6px 12px;" onclick="hangup()">✕ End</button>
       </div>
 
-      <div class="viewer-canvas-wrap" id="canvasWrap">
-        <video id="remoteVideo" autoplay playsinline muted></video>
-        <div class="viewer-overlay" id="viewerOverlay">
-          <div class="spinner"></div>
-          <div class="overlay-text" id="overlayMsg">Waiting for screen stream…</div>
+      <div class="vscreen" id="vscreen">
+        <video id="vid" autoplay playsinline muted></video>
+        <div class="voverlay" id="voverlay">
+          <div class="spin"></div>
+          <div class="voverlay-txt" id="vtxt">Waiting for host…</div>
         </div>
-        <div id="inputOverlay" style="position:absolute;inset:0;cursor:none;z-index:5;"
-             onmousemove="relayMouse(event,'move')"
-             onmousedown="relayMouse(event,'down')"
-             onmouseup="relayMouse(event,'up')"
-             onclick="relayMouse(event,'click')"
-             oncontextmenu="relayMouse(event,'rclick');return false;"
-             ondblclick="relayMouse(event,'dblclick')"
-             onwheel="relayWheel(event)"></div>
-        <div id="remoteCursor" style="position:absolute;pointer-events:none;z-index:6;width:12px;height:12px;border-radius:50%;border:2px solid var(--accent);background:rgba(0,229,255,0.2);transform:translate(-50%,-50%);display:none;"></div>
+        <div class="vinput-layer" id="vilayer"
+          onmousemove="rm(event,'move')"
+          onmousedown="rm(event,'dn')"
+          onmouseup="rm(event,'up')"
+          onclick="rm(event,'clk')"
+          oncontextmenu="rm(event,'rclk');return false;"
+          ondblclick="rm(event,'dbl')"
+          onwheel="rw(event)">
+        </div>
+        <div class="vcursor" id="vcursor"></div>
       </div>
 
-      <div class="control-hints">
-        <div class="hint"><span class="key">Mouse</span> relayed</div>
-        <div class="hint"><span class="key">Keyboard</span> relayed</div>
-        <div class="hint"><span class="key">Scroll</span> relayed</div>
-        <div class="hint" style="margin-left:auto;color:var(--accent3);">WebRTC P2P</div>
+      <div class="vhints">
+        <div class="vhint"><span class="vkey">Mouse</span>forwarded</div>
+        <div class="vhint"><span class="vkey">Keyboard</span>forwarded</div>
+        <div class="vhint"><span class="vkey">Scroll</span>forwarded</div>
+        <div class="vhint"><span class="vkey">Right-click</span>forwarded</div>
+        <div class="vlat" style="margin-left:auto;" id="vqual">Quality: Auto</div>
       </div>
     </div>
 
-    <div class="log-panel" id="logPanel"></div>
+    <div class="console" id="con"></div>
   </div>
 </div>
-</div>
 
-<div class="modal-backdrop" id="incomingModal">
+<!-- MODAL -->
+<div class="modal-bg" id="modalbg">
   <div class="modal">
-    <div class="modal-icon">📡</div>
-    <h3>Incoming Connection Request</h3>
-    <p>A peer wants to view and control this device's screen. Only allow from people you trust.</p>
-    <div class="modal-id" id="incomingPeerId">—</div>
-    <div class="modal-actions">
-      <button class="btn btn-ghost" onclick="rejectRequest()">✕ Reject</button>
-      <button class="btn btn-success" onclick="acceptRequest()">✓ Allow Access</button>
+    <div class="modal-ico">📡</div>
+    <h3>Incoming Request</h3>
+    <p>This device wants to view and control your screen. Only allow from trusted people.</p>
+    <div class="modal-id" id="modalid">—</div>
+    <div class="modal-row">
+      <button class="btn btn-no" onclick="deny()">✕ Deny</button>
+      <button class="btn btn-ok" onclick="allow()">✓ Allow</button>
     </div>
   </div>
 </div>
 
-<div class="toast-container" id="toastContainer"></div>
+<div class="toasts" id="toasts"></div>
 
 <script>
-let peer = null, activeConn = null, localStream = null;
-let mediaConn = null, pendingCallConn = null, myId = '';
-let latencyInterval = null, retryCount = 0;
+// ═══════════════════════════════════════════════════════════════════
+//  RemoteLink — Pure WebRTC, no PeerJS
+//  Signaling: wss://socketsbay.com/wss/v2/1/demo/
+//  This is a free public WebSocket channel. Each user gets a random
+//  room-style ID; messages are JSON-envelope routed by "to" field.
+// ═══════════════════════════════════════════════════════════════════
 
-function loadPeerJS(cb) {
-  if (window.Peer) { cb(); return; }
-  const s = document.createElement('script');
-  s.src = 'https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js';
-  s.onload = () => { log('PeerJS 1.5.4 loaded ✓', 'success'); cb(); };
-  s.onerror = () => {
-    log('unpkg failed, trying cdnjs…', 'warn');
-    const s2 = document.createElement('script');
-    s2.src = 'https://cdnjs.cloudflare.com/ajax/libs/peerjs/1.5.2/peerjs.min.js';
-    s2.onload = () => { log('PeerJS loaded via cdnjs ✓', 'success'); cb(); };
-    s2.onerror = () => { log('All CDNs failed.', 'err'); toast('Cannot load WebRTC library — check internet', 'error'); setStatus('error','CDN failed'); };
-    document.head.appendChild(s2);
-  };
-  document.head.appendChild(s);
-}
-
-function genId() {
-  return Math.random().toString(36).slice(2,6) + Math.random().toString(36).slice(2,6);
-}
-
-function initPeer() {
-  myId = genId();
-  log(`Generated ID: ${myId}`, 'info');
-
-  try {
-    peer = new Peer(myId, {
-      host: '0.peerjs.com',
-      port: 443,
-      path: '/',
-      secure: true,
-      key: 'peerjs',
-      debug: 1,
-      config: {
-        iceServers: [
-          { urls: 'stun:stun.l.google.com:19302' },
-          { urls: 'stun:stun1.l.google.com:19302' },
-          { urls: 'stun:stun2.l.google.com:19302' },
-          { urls: 'stun:stun3.l.google.com:19302' },
-          { urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' },
-          { urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' }
-        ]
-      }
-    });
-  } catch(e) {
-    log(`Peer constructor error: ${e.message}`, 'err');
-    showRetryBanner();
-    return;
-  }
-
-  peer.on('open', id => {
-    myId = id;
-    document.getElementById('myPeerId').textContent = id;
-    document.getElementById('copyHint').textContent = 'click to copy';
-    document.getElementById('connectBtn').disabled = false;
-    document.getElementById('retryBanner').classList.re
+const ICE = {
+  iceServers: [
+    { urls: 'stun:stun.l.google.com:19302' },
+    { urls: 'stun:stun1.l.google.com:19302' },
+    { urls: 'stun:stun2.l.google.com:19302' },
+    { urls: 'stun:stun3.l.google.com:19302' },
+    { urls: 'stun:stun4.l.google.com:19302' },
+    // Free TURN — helps punch through strict NAT
+    { urls:'turn:openrelay.metered.ca:80',   username:'openrelayproject', credential:'openrelayproject' },
+    { urls:'turn:openrelay.metered.ca:443',  username:'openrelayproject', credential:'openrelayproject' },
+    {
